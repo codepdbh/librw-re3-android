@@ -1528,10 +1528,24 @@ static struct {
 	int gl;
 	int major, minor;
 } profiles[] = {
+#if defined ANDROID
+	// Android's EGL/GLES driver has no desktop GL at all -- SDL_CreateWindow()
+	// there just creates the Java-side Surface and doesn't itself validate
+	// the requested GL profile/version (that's deferred to the later
+	// SDL_GL_CreateContext() call below), so the desktop CORE entries this
+	// list has for every other platform would "succeed" here too, then hang
+	// the driver trying to actually satisfy a CORE 3.3 context over EGL
+	// (observed: the SDLThread parks in the kernel indefinitely -- no crash,
+	// no ANR since it's not the Java UI thread, just a permanently black
+	// screen). ES-only order avoids ever attempting that.
+	{ SDL_GL_CONTEXT_PROFILE_ES, 3, 1 },
+	{ SDL_GL_CONTEXT_PROFILE_ES, 2, 0 },
+#else
 	{ SDL_GL_CONTEXT_PROFILE_CORE, 3, 3 },
 	{ SDL_GL_CONTEXT_PROFILE_CORE, 2, 1 },
 	{ SDL_GL_CONTEXT_PROFILE_ES, 3, 1 },
 	{ SDL_GL_CONTEXT_PROFILE_ES, 2, 0 },
+#endif
 	{ 0, 0, 0 },
 };
 
@@ -1920,6 +1934,8 @@ finalizeOpenGL(void)
 }
 
 #ifdef LIBRW_SDL2
+static int sdl2CurrentSubsystem = 0;
+
 static int
 deviceSystemSDL2(DeviceReq req, void *arg, int32 n)
 {
@@ -1939,7 +1955,27 @@ deviceSystemSDL2(DeviceReq req, void *arg, int32 n)
 	case DEVICEFINALIZE:
 		return finalizeOpenGL();
 
-	// TODO: implement subsystems
+	// SDL2's own "subsystem" equivalent is a display, mirroring what the
+	// GLFW backend below does with monitors -- unimplemented previously,
+	// which crashed every SDL2 build the very first time anything asked
+	// (psSelectDevice() always does, on startup) via the assert(0) below.
+	case DEVICEGETNUMSUBSYSTEMS:
+		return SDL_GetNumVideoDisplays();
+
+	case DEVICEGETCURRENTSUBSYSTEM:
+		return sdl2CurrentSubsystem;
+
+	case DEVICESETSUBSYSTEM:
+		if(n >= SDL_GetNumVideoDisplays())
+			return 0;
+		sdl2CurrentSubsystem = n;
+		return 1;
+
+	case DEVICEGETSUBSSYSTEMINFO:
+		if(n >= SDL_GetNumVideoDisplays())
+			return 0;
+		strncpy(((SubSystemInfo*)arg)->name, SDL_GetDisplayName(n), sizeof(SubSystemInfo::name));
+		return 1;
 
 	case DEVICEGETNUMVIDEOMODES:
 		return glGlobals.numModes;
