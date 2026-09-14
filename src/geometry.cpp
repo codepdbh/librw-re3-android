@@ -784,9 +784,23 @@ MaterialList::streamRead(Stream *stream, MaterialList *matlist)
 
 	Material *m;
 	for(int32 i = 0; i < numMat; i++){
-		if(indices[i] >= 0){
+		// A "shared material" index only ever legitimately points at a
+		// slot this same loop already populated (indices < i) -- appendMaterial()
+		// below keeps matlist->numMaterials in lockstep with i. A malformed/
+		// corrupted DFF (seen crashing here on a "Frosted Winter Remastered"
+		// model) can carry an index that's in-bounds for the numMat-sized
+		// allocation but not yet written, handing back uninitialized heap
+		// memory that addRef() then dereferences as a Material* garbage
+		// pointer. No stream chunk was written for a "shared" entry, so
+		// there's no real material left to recover here -- fall back to a
+		// harmless default instead of crashing.
+		if(indices[i] >= 0 && indices[i] < i){
 			m = matlist->materials[indices[i]];
 			m->addRef();
+		}else if(indices[i] >= 0){
+			m = Material::create();
+			if(m == nil)
+				goto fail;
 		}else{
 			if(!findChunk(stream, ID_MATERIAL, nil, nil)){
 				RWERROR((ERR_CHUNK, "MATERIAL"));
