@@ -164,18 +164,12 @@ if(LIBRW_PLATFORM_GL3)
         )
     endif()
 
-    if(ANDROID)
-        # There's no desktop GL to find_package() here -- Android provides
-        # OpenGL ES (+ EGL for the context/surface calls RW_GL3 also needs)
-        # as NDK-provided stub libraries instead, resolved directly by name
-        # rather than through CMake's builtin FindOpenGL (which has no
-        # Android path and would just fail below).
-        target_link_libraries(librw
-            PRIVATE
-                GLESv3
-                EGL
-        )
-    else()
+    if(NOT ANDROID)
+        # There's no desktop GL to find_package() here -- the game target
+        # itself links GLESv3 directly by name on Android instead (see
+        # src/CMakeLists.txt), which is enough since librw builds as a
+        # static lib here (unresolved GL symbols in it are fine until the
+        # final link, which is that target's job, not this one's).
         set(OpenGL_GL_PREFERENCE GLVND)
         find_package(OpenGL)
         if(TARGET OpenGL::OpenGL)

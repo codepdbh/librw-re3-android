@@ -327,6 +327,29 @@ conv_RGBA8888_from_ARGB1555(uint8 *out, uint8 *in)
 	out[3] = a*0xFF;
 }
 
+// D3D's R5G6B5, little endian
+void
+conv_RGB888_from_RGB565(uint8 *out, uint8 *in)
+{
+	uint32 r, g, b;
+	r = (in[1]>>3) & 0x1F;
+	g = (in[1]&7)<<3 | ((in[0]>>5)&7);
+	b = in[0] & 0x1F;
+	out[0] = r*0xFF/0x1f;
+	out[1] = g*0xFF/0x3f;
+	out[2] = b*0xFF/0x1f;
+}
+
+// D3D's A4R4G4B4, little endian
+void
+conv_RGBA8888_from_ARGB4444(uint8 *out, uint8 *in)
+{
+	out[0] = (in[1]&0xF)*0x11;
+	out[1] = (in[0]>>4)*0x11;
+	out[2] = (in[0]&0xF)*0x11;
+	out[3] = (in[1]>>4)*0x11;
+}
+
 void
 conv_ABGR1555_from_ARGB1555(uint8 *out, uint8 *in)
 {
@@ -532,6 +555,10 @@ Raster::convertTexToCurrentPlatform(rw::Raster *ras)
 	// fall back to going through Image directly
 	int32 width, height, depth, format;
 	Image *img = ras->toImage();
+	// unconvertible format (toImage() already logged it): keep the raster
+	// as it is rather than crash on a nil image
+	if(img == nil)
+		return ras;
 	// TODO: maybe don't *always* do this?
 	img->unpalettize();
 	Raster::imageFindRasterFormat(img, Raster::TEXTURE, &width, &height, &depth, &format);

@@ -902,10 +902,19 @@ rasterToImage(Raster *raster)
 		depth = 16;
 		conv = conv_ARGB1555_from_RGB555;
 		break;
+	// Images have no 565/4444 layout, so these widen. Mod TXDs (GTA Advance's
+	// particle.txd) do carry them; failing here returned a nil image that
+	// convertTexToCurrentPlatform() dereferenced right away.
+	case Raster::C565:
+		depth = 24;
+		conv = conv_RGB888_from_RGB565;
+		break;
+	case Raster::C4444:
+		depth = 32;
+		conv = conv_RGBA8888_from_ARGB4444;
+		break;
 
 	default:
-	case Raster::C565:
-	case Raster::C4444:
 	case Raster::LUM8:
 		RWERROR((ERR_INVRASTER));
 		return nil;
